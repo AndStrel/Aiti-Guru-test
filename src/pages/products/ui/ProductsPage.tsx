@@ -3,7 +3,7 @@ import { EllipsisOutlined, LogoutOutlined, PlusOutlined, ReloadOutlined, SearchO
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Button, Card, Form, Input, InputNumber, Layout, Modal, Space, Table, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import type { SortOrder, SorterResult } from 'antd/es/table/interface'
+import type { SortOrder, SorterResult, TableCurrentDataSource, TablePaginationConfig } from 'antd/es/table/interface'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchProducts } from '../../../entities/product/api/productsApi'
 import type { Product } from '../../../types'
@@ -20,7 +20,7 @@ interface AddProductFormValues {
   sku: string
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -62,10 +62,20 @@ export function ProductsPage() {
     }, { replace: true })
   }
 
-  const handleTableChange = (_pagination: unknown, _filters: unknown, sorter: SorterResult<Product> | SorterResult<Product>[]) => {
+  const handleTableChange = (
+    pagination: TablePaginationConfig,
+    _filters: unknown,
+    sorter: SorterResult<Product> | SorterResult<Product>[],
+    extra: TableCurrentDataSource<Product>,
+  ) => {
     const { field, order } = Array.isArray(sorter) ? sorter[0] : sorter
 
-    setCurrentPage(1)
+    setCurrentPage(pagination.current ?? 1)
+
+    if (extra.action !== 'sort') {
+      return
+    }
+
     updateSearchParams({
       sortBy: (field === 'price' || field === 'rating') ? field : null,
       order: order === 'ascend' ? 'asc' : order === 'descend' ? 'desc' : null,
@@ -190,7 +200,7 @@ export function ProductsPage() {
       {contextHolder}
       <Layout className="products-layout">
         <div className="products-shell">
-          <Card className="products-toolbar-card" bordered={false}>
+          <Card className="products-toolbar-card" variant="borderless">
             <div className="products-toolbar">
               <Typography.Title className="products-page-title" level={2}>
                 Товары
@@ -212,7 +222,7 @@ export function ProductsPage() {
             </div>
           </Card>
 
-          <Card className="products-list-card" bordered={false}>
+          <Card className="products-list-card" variant="borderless">
             <div className="products-list-header">
               <Typography.Title className="products-list-title" level={3}>
                 Все позиции
@@ -247,7 +257,7 @@ export function ProductsPage() {
                 total: products.length,
                 showSizeChanger: false,
                 onChange: setCurrentPage,
-                position: ['bottomRight'],
+                placement: ['bottomEnd'],
               }}
               rowSelection={{ columnWidth: 46 }}
               scroll={{ x: 980 }}
@@ -260,7 +270,7 @@ export function ProductsPage() {
       <Modal
         title="Добавить товар"
         open={isAddModalOpen}
-        destroyOnClose
+        destroyOnHidden
         okText="Добавить"
         cancelText="Отмена"
         onCancel={handleAddModalClose}

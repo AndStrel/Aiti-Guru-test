@@ -16,7 +16,7 @@ function RootRedirect() {
 
 export function AppRouter() {
   return (
-    <HashRouter>
+    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path={ROUTES.ROOT} element={<RootRedirect />} />
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
