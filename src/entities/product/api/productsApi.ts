@@ -1,9 +1,15 @@
 import type { Product, ProductsResponse } from '../model/product.types'
 
 const PRODUCTS_URL = 'https://dummyjson.com/products'
+const SEARCH_PRODUCTS_URL = 'https://dummyjson.com/products/search'
 
-export async function fetchProducts(): Promise<Product[]> {
-  const response = await fetch(PRODUCTS_URL)
+export async function fetchProducts(searchQuery = ''): Promise<Product[]> {
+  const normalizedQuery = searchQuery.trim()
+  const requestUrl = normalizedQuery
+    ? `${SEARCH_PRODUCTS_URL}?q=${encodeURIComponent(normalizedQuery)}`
+    : PRODUCTS_URL
+
+  const response = await fetch(requestUrl)
 
   if (!response.ok) {
     throw new Error('Не удалось загрузить список товаров')
