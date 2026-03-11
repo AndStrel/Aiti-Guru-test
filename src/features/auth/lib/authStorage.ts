@@ -1,8 +1,10 @@
-import type { AuthSession } from '../model/auth.types'
+import type { AuthSession, RegisteredCredentials } from '../model/auth.types'
 
 const AUTH_STORAGE_KEY = 'auth-session'
+const REGISTERED_CREDENTIALS_STORAGE_KEY = 'registered-credentials'
 
 type MaybeSession = Partial<AuthSession>
+type MaybeRegisteredCredentials = Partial<RegisteredCredentials>
 
 function isAuthSession(value: unknown): value is AuthSession {
   if (!value || typeof value !== 'object') {
@@ -36,6 +38,39 @@ function parseSession(rawValue: string | null): AuthSession | null {
   }
 }
 
+function isRegisteredCredentials(value: unknown): value is RegisteredCredentials {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const registered = value as MaybeRegisteredCredentials
+  const user = registered.user
+
+  if (!user || typeof user !== 'object') {
+    return false
+  }
+
+  return (
+    typeof registered.username === 'string' &&
+    typeof registered.password === 'string' &&
+    typeof user.id === 'number' &&
+    typeof user.username === 'string'
+  )
+}
+
+function parseRegisteredCredentials(rawValue: string | null): RegisteredCredentials | null {
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown
+    return isRegisteredCredentials(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 export function saveAuthSession(session: AuthSession, remember: boolean): void {
   const serializedSession = JSON.stringify(session)
 
@@ -61,4 +96,12 @@ export function loadAuthSession(): AuthSession | null {
 export function clearAuthSession(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY)
   sessionStorage.removeItem(AUTH_STORAGE_KEY)
+}
+
+export function saveRegisteredCredentials(credentials: RegisteredCredentials): void {
+  localStorage.setItem(REGISTERED_CREDENTIALS_STORAGE_KEY, JSON.stringify(credentials))
+}
+
+export function loadRegisteredCredentials(): RegisteredCredentials | null {
+  return parseRegisteredCredentials(localStorage.getItem(REGISTERED_CREDENTIALS_STORAGE_KEY))
 }

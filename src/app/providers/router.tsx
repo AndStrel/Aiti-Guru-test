@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from '../../pages/login/ui/LoginPage'
 import { ProductsPage } from '../../pages/products/ui/ProductsPage'
+import { RegisterPage } from '../../pages/register/ui/RegisterPage'
 import { useAuthStore } from '../../features/auth/model/useAuthStore'
 import { ROUTES } from '../../shared/config/routes'
 import { RequireAuth } from '../../shared/lib/guards/RequireAuth'
@@ -19,6 +20,7 @@ export function AppRouter() {
       <Routes>
         <Route path={ROUTES.ROOT} element={<RootRedirect />} />
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+        <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
         <Route element={<RequireAuth />}>
           <Route path={ROUTES.PRODUCTS} element={<ProductsPage />} />
         </Route>

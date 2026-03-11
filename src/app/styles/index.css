@@ -30,6 +30,11 @@ body {
   max-width: 420px;
 }
 
+.auth-switch {
+  text-align: center;
+  font-size: 16px;
+}
+
 .products-layout {
   min-height: 100vh;
   padding: 24px;
@@ -38,4 +43,13 @@ body {
 .products-card {
   max-width: 900px;
   margin: 0 auto;
+}
+
+.products-card .ant-table-wrapper {
+  overflow-x: auto;
+}
+
+.rating-low {
+  color: #ff4d4f;
+  font-weight: 600;
 }

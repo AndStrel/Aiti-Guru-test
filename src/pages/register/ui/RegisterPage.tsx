@@ -7,18 +7,19 @@ import { ROUTES } from '../../../shared/config/routes'
 
 const REQUIRED_FIELD_MESSAGE = 'Поле обязательно для заполнения'
 
-interface LoginFormValues {
+interface RegisterFormValues {
   username: string
   password: string
+  confirmPassword: string
   remember: boolean
 }
 
-export function LoginPage() {
+export function RegisterPage() {
   const navigate = useNavigate()
-  const [form] = Form.useForm<LoginFormValues>()
+  const [form] = Form.useForm<RegisterFormValues>()
   const [messageApi, contextHolder] = message.useMessage()
 
-  const login = useAuthStore((state) => state.login)
+  const register = useAuthStore((state) => state.register)
   const isLoading = useAuthStore((state) => state.isLoading)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const error = useAuthStore((state) => state.error)
@@ -35,9 +36,9 @@ export function LoginPage() {
     }
   }, [isAuthenticated, navigate])
 
-  const handleFinish = async (values: LoginFormValues): Promise<void> => {
+  const handleFinish = async (values: RegisterFormValues): Promise<void> => {
     try {
-      await login(
+      await register(
         {
           username: values.username.trim(),
           password: values.password,
@@ -46,8 +47,9 @@ export function LoginPage() {
       )
 
       navigate(ROUTES.PRODUCTS, { replace: true })
-    } catch (authError) {
-      const errorText = authError instanceof Error ? authError.message : 'Не удалось выполнить вход'
+    } catch (registerError) {
+      const errorText =
+        registerError instanceof Error ? registerError.message : 'Не удалось зарегистрироваться'
       messageApi.error(errorText)
     }
   }
@@ -62,8 +64,8 @@ export function LoginPage() {
     <>
       {contextHolder}
       <Layout className="login-layout">
-        <Card className="login-card" title="Авторизация">
-          <Form<LoginFormValues>
+        <Card className="login-card" title="Создать аккаунт">
+          <Form<RegisterFormValues>
             form={form}
             layout="vertical"
             initialValues={{
@@ -73,15 +75,38 @@ export function LoginPage() {
             onValuesChange={handleValuesChange}
           >
             <Form.Item label="Логин" name="username" rules={[{ required: true, message: REQUIRED_FIELD_MESSAGE }]}>
-              <Input autoComplete="username" placeholder="Введите логин (например, emilys)" prefix={<UserOutlined />} />
+              <Input autoComplete="username" placeholder="Введите логин" prefix={<UserOutlined />} />
             </Form.Item>
 
             <Form.Item
               label="Пароль"
               name="password"
-              rules={[{ required: true, message: REQUIRED_FIELD_MESSAGE }]}
+              rules={[
+                { required: true, message: REQUIRED_FIELD_MESSAGE },
+                { min: 4, message: 'Минимум 4 символа' },
+              ]}
             >
-              <Input.Password autoComplete="current-password" placeholder="Введите пароль" prefix={<LockOutlined />} />
+              <Input.Password autoComplete="new-password" placeholder="Введите пароль" prefix={<LockOutlined />} />
+            </Form.Item>
+
+            <Form.Item
+              label="Повторите пароль"
+              name="confirmPassword"
+              dependencies={['password']}
+              rules={[
+                { required: true, message: REQUIRED_FIELD_MESSAGE },
+                ({ getFieldValue }) => ({
+                  validator(_rule, value: string) {
+                    if (!value || getFieldValue('password') === value) {
+                      return Promise.resolve()
+                    }
+
+                    return Promise.reject(new Error('Пароли не совпадают'))
+                  },
+                }),
+              ]}
+            >
+              <Input.Password autoComplete="new-password" placeholder="Повторите пароль" prefix={<LockOutlined />} />
             </Form.Item>
 
             <Form.Item name="remember" valuePropName="checked">
@@ -96,15 +121,15 @@ export function LoginPage() {
 
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={isLoading} block>
-                Войти
+                Создать аккаунт
               </Button>
             </Form.Item>
 
             <Divider plain>или</Divider>
 
             <div className="auth-switch">
-              <Typography.Text type="secondary">Нет аккаунта?</Typography.Text>{' '}
-              <Link to={ROUTES.REGISTER}>Создать</Link>
+              <Typography.Text type="secondary">Уже есть аккаунт?</Typography.Text>{' '}
+              <Link to={ROUTES.LOGIN}>Войти</Link>
             </div>
           </Form>
         </Card>

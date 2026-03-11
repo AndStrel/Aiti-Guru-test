@@ -1,7 +1,9 @@
-import type { AuthSession, AuthUser, LoginRequest, LoginResponse } from '../model/auth.types'
+import type { AuthSession, AuthUser, LoginRequest, LoginResponse, RegisterRequest } from '../model/auth.types'
 
 const AUTH_LOGIN_URL = 'https://dummyjson.com/auth/login'
+const AUTH_REGISTER_URL = 'https://dummyjson.com/users/add'
 const DEFAULT_AUTH_ERROR = 'Не удалось выполнить вход'
+const DEFAULT_REGISTER_ERROR = 'Не удалось зарегистрироваться'
 
 interface ApiErrorPayload {
   message?: string
@@ -72,5 +74,33 @@ export async function loginRequest(credentials: LoginRequest): Promise<AuthSessi
   return {
     token,
     user: mapUser(loginResponse),
+  }
+}
+
+export async function registerRequest(credentials: RegisterRequest): Promise<AuthSession> {
+  const response = await fetch(AUTH_REGISTER_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  })
+
+  const payload = (await response.json()) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractErrorMessage(payload) ?? DEFAULT_REGISTER_ERROR)
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    throw new Error(DEFAULT_REGISTER_ERROR)
+  }
+
+  const registeredUser = mapUser(payload as LoginResponse)
+  const localToken = `registered-${registeredUser.id}-${Date.now()}`
+
+  return {
+    token: localToken,
+    user: registeredUser,
   }
 }

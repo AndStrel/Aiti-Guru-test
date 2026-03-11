@@ -12,6 +12,11 @@ export interface LoginRequest {
   password: string
 }
 
+export interface RegisterRequest {
+  username: string
+  password: string
+}
+
 export interface LoginResponse extends AuthUser {
   token?: string
   accessToken?: string
@@ -21,4 +26,10 @@ export interface LoginResponse extends AuthUser {
 export interface AuthSession {
   user: AuthUser
   token: string
+}
+
+export interface RegisteredCredentials {
+  username: string
+  password: string
+  user: AuthUser
 }
