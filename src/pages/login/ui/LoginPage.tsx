@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { LockOutlined, MailOutlined } from '@ant-design/icons'
+import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Checkbox, Divider, Form, Input, Layout, Typography, message } from 'antd'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../../features/auth/model/useAuthStore'
 import { ROUTES } from '../../../shared/config/routes'
 
@@ -14,7 +14,6 @@ interface LoginFormValues {
 }
 
 export function LoginPage() {
-  const navigate = useNavigate()
   const [form] = Form.useForm<LoginFormValues>()
   const [messageApi, contextHolder] = message.useMessage()
 
@@ -29,12 +28,6 @@ export function LoginPage() {
     return clearError
   }, [clearError])
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate(ROUTES.PRODUCTS, { replace: true })
-    }
-  }, [isAuthenticated, navigate])
-
   const handleFinish = async (values: LoginFormValues): Promise<void> => {
     try {
       await login(
@@ -44,8 +37,6 @@ export function LoginPage() {
         },
         values.remember,
       )
-
-      navigate(ROUTES.PRODUCTS, { replace: true })
     } catch (authError) {
       const errorText = authError instanceof Error ? authError.message : 'Не удалось выполнить вход'
       messageApi.error(errorText)
@@ -58,12 +49,27 @@ export function LoginPage() {
     }
   }
 
+  if (isAuthenticated) {
+    return <Navigate to={ROUTES.PRODUCTS} replace />
+  }
+
   return (
     <>
       {contextHolder}
       <Layout className="login-layout">
-        <Card className="login-card" title="Авторизация">
+        <Card className="login-card">
+          <div className="auth-header">
+            <div className="auth-logo" aria-hidden="true" />
+            <Typography.Title level={1} className="auth-title">
+              Добро пожаловать!
+            </Typography.Title>
+            <Typography.Paragraph className="auth-subtitle">
+              Пожалуйста, авторизуйтесь
+            </Typography.Paragraph>
+          </div>
+
           <Form<LoginFormValues>
+            className="auth-form"
             form={form}
             layout="vertical"
             initialValues={{
@@ -74,9 +80,11 @@ export function LoginPage() {
           >
             <Form.Item label="Почта" name="email" rules={[{ required: true, message: REQUIRED_FIELD_MESSAGE }]}>
               <Input
+                className="auth-input"
                 autoComplete="email"
-                placeholder="Введите почту (для теста: emilys)"
-                prefix={<MailOutlined />}
+                placeholder="Введите почту"
+                prefix={<UserOutlined />}
+                allowClear
               />
             </Form.Item>
 
@@ -85,10 +93,15 @@ export function LoginPage() {
               name="password"
               rules={[{ required: true, message: REQUIRED_FIELD_MESSAGE }]}
             >
-              <Input.Password autoComplete="current-password" placeholder="Введите пароль" prefix={<LockOutlined />} />
+              <Input.Password
+                className="auth-input"
+                autoComplete="current-password"
+                placeholder="Введите пароль"
+                prefix={<LockOutlined />}
+              />
             </Form.Item>
 
-            <Form.Item name="remember" valuePropName="checked">
+            <Form.Item className="auth-checkbox-item" name="remember" valuePropName="checked">
               <Checkbox>Запомнить данные</Checkbox>
             </Form.Item>
 
@@ -99,12 +112,14 @@ export function LoginPage() {
             ) : null}
 
             <Form.Item>
-              <Button type="primary" htmlType="submit" loading={isLoading} block>
+              <Button className="auth-submit-button" type="primary" htmlType="submit" loading={isLoading} block>
                 Войти
               </Button>
             </Form.Item>
 
-            <Divider plain>или</Divider>
+            <Divider className="auth-divider" plain>
+              или
+            </Divider>
 
             <div className="auth-switch">
               <Typography.Text type="secondary">Нет аккаунта?</Typography.Text>{' '}

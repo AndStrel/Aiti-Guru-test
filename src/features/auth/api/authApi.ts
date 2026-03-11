@@ -9,6 +9,32 @@ interface ApiErrorPayload {
   message?: string
 }
 
+async function sendAuthRequest(
+  url: string,
+  credentials: LoginRequest | RegisterRequest,
+  defaultErrorMessage: string,
+): Promise<LoginResponse> {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  })
+
+  const payload = (await response.json()) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractErrorMessage(payload) ?? defaultErrorMessage)
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    throw new Error(defaultErrorMessage)
+  }
+
+  return payload as LoginResponse
+}
+
 function extractErrorMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') {
     return null
@@ -46,25 +72,7 @@ function mapUser(payload: LoginResponse): AuthUser {
 }
 
 export async function loginRequest(credentials: LoginRequest): Promise<AuthSession> {
-  const response = await fetch(AUTH_LOGIN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(credentials),
-  })
-
-  const payload = (await response.json()) as unknown
-
-  if (!response.ok) {
-    throw new Error(extractErrorMessage(payload) ?? DEFAULT_AUTH_ERROR)
-  }
-
-  if (!payload || typeof payload !== 'object') {
-    throw new Error(DEFAULT_AUTH_ERROR)
-  }
-
-  const loginResponse = payload as LoginResponse
+  const loginResponse = await sendAuthRequest(AUTH_LOGIN_URL, credentials, DEFAULT_AUTH_ERROR)
   const token = extractToken(loginResponse)
 
   if (!token) {
@@ -78,25 +86,7 @@ export async function loginRequest(credentials: LoginRequest): Promise<AuthSessi
 }
 
 export async function registerRequest(credentials: RegisterRequest): Promise<AuthSession> {
-  const response = await fetch(AUTH_REGISTER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(credentials),
-  })
-
-  const payload = (await response.json()) as unknown
-
-  if (!response.ok) {
-    throw new Error(extractErrorMessage(payload) ?? DEFAULT_REGISTER_ERROR)
-  }
-
-  if (!payload || typeof payload !== 'object') {
-    throw new Error(DEFAULT_REGISTER_ERROR)
-  }
-
-  const registeredUser = mapUser(payload as LoginResponse)
+  const registeredUser = mapUser(await sendAuthRequest(AUTH_REGISTER_URL, credentials, DEFAULT_REGISTER_ERROR))
   const localToken = `registered-${registeredUser.id}-${Date.now()}`
 
   return {

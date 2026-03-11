@@ -3,69 +3,13 @@ import type { AuthSession, RegisteredCredentials } from '../model/auth.types'
 const AUTH_STORAGE_KEY = 'auth-session'
 const REGISTERED_CREDENTIALS_STORAGE_KEY = 'registered-credentials'
 
-type MaybeSession = Partial<AuthSession>
-type MaybeRegisteredCredentials = Partial<RegisteredCredentials>
-
-function isAuthSession(value: unknown): value is AuthSession {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-
-  const session = value as MaybeSession
-  const user = session.user
-
-  if (!user || typeof user !== 'object') {
-    return false
-  }
-
-  return (
-    typeof session.token === 'string' &&
-    typeof user.id === 'number' &&
-    typeof user.username === 'string'
-  )
-}
-
-function parseSession(rawValue: string | null): AuthSession | null {
+function parseStorageValue<T>(rawValue: string | null): T | null {
   if (!rawValue) {
     return null
   }
 
   try {
-    const parsed = JSON.parse(rawValue) as unknown
-    return isAuthSession(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-function isRegisteredCredentials(value: unknown): value is RegisteredCredentials {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-
-  const registered = value as MaybeRegisteredCredentials
-  const user = registered.user
-
-  if (!user || typeof user !== 'object') {
-    return false
-  }
-
-  return (
-    typeof registered.username === 'string' &&
-    typeof registered.password === 'string' &&
-    typeof user.id === 'number' &&
-    typeof user.username === 'string'
-  )
-}
-
-function parseRegisteredCredentials(rawValue: string | null): RegisteredCredentials | null {
-  if (!rawValue) {
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(rawValue) as unknown
-    return isRegisteredCredentials(parsed) ? parsed : null
+    return JSON.parse(rawValue) as T
   } catch {
     return null
   }
@@ -85,12 +29,12 @@ export function saveAuthSession(session: AuthSession, remember: boolean): void {
 }
 
 export function loadAuthSession(): AuthSession | null {
-  const localSession = parseSession(localStorage.getItem(AUTH_STORAGE_KEY))
+  const localSession = parseStorageValue<AuthSession>(localStorage.getItem(AUTH_STORAGE_KEY))
   if (localSession) {
     return localSession
   }
 
-  return parseSession(sessionStorage.getItem(AUTH_STORAGE_KEY))
+  return parseStorageValue<AuthSession>(sessionStorage.getItem(AUTH_STORAGE_KEY))
 }
 
 export function clearAuthSession(): void {
@@ -103,5 +47,5 @@ export function saveRegisteredCredentials(credentials: RegisteredCredentials): v
 }
 
 export function loadRegisteredCredentials(): RegisteredCredentials | null {
-  return parseRegisteredCredentials(localStorage.getItem(REGISTERED_CREDENTIALS_STORAGE_KEY))
+  return parseStorageValue<RegisteredCredentials>(localStorage.getItem(REGISTERED_CREDENTIALS_STORAGE_KEY))
 }

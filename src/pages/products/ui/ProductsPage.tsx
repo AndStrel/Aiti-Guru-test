@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { EllipsisOutlined, LogoutOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Button, Card, Form, Input, InputNumber, Layout, Modal, Space, Table, Typography, message } from 'antd'
-import type { ColumnsType, TableProps } from 'antd/es/table'
+import type { ColumnsType } from 'antd/es/table'
 import type { SortOrder, SorterResult } from 'antd/es/table/interface'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useAuthStore } from '../../../features/auth/model/useAuthStore'
-import { ROUTES } from '../../../shared/config/routes'
 import { fetchProducts } from '../../../entities/product/api/productsApi'
 import type { Product } from '../../../entities/product/model/product.types'
+import { useAuthStore } from '../../../features/auth/model/useAuthStore'
+import { ROUTES } from '../../../shared/config/routes'
 
 type SortField = 'price' | 'rating'
 type SortDirection = 'asc' | 'desc'
@@ -35,6 +36,13 @@ function toSortOrder(sortField: SortField | null, sortDirection: SortDirection |
   return sortDirection === 'asc' ? 'ascend' : 'descend'
 }
 
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(price)
+}
+
 export function ProductsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -42,7 +50,7 @@ export function ProductsPage() {
   const [sessionProducts, setSessionProducts] = useState<Product[]>([])
   const [addProductForm] = Form.useForm<AddProductFormValues>()
   const [messageApi, contextHolder] = message.useMessage()
-  const user = useAuthStore((state) => state.user)
+
   const logout = useAuthStore((state) => state.logout)
   const searchQuery = searchParams.get('q') ?? ''
   const sortField = parseSortField(searchParams.get('sortBy'))
@@ -53,40 +61,27 @@ export function ProductsPage() {
       const nextParams = new URLSearchParams(currentParams)
 
       Object.entries(updates).forEach(([key, value]) => {
-        if (value === null || value === '') {
+        if (value) {
+          nextParams.set(key, value)
+        } else {
           nextParams.delete(key)
-          return
         }
-
-        nextParams.set(key, value)
       })
 
       return nextParams
     }, { replace: true })
   }
 
-  const handleSearchChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-    updateSearchParams({ q: event.target.value })
-  }
+  const handleTableChange = (_pagination: unknown, _filters: unknown, sorter: SorterResult<Product> | SorterResult<Product>[]) => {
+    const nextSorter = Array.isArray(sorter) ? sorter[0] : sorter
+    const candidateField = nextSorter?.field ?? nextSorter?.columnKey
+    const nextSortField = candidateField === 'price' || candidateField === 'rating' ? candidateField : null
+    const nextSortDirection = nextSorter?.order === 'ascend' ? 'asc' : nextSorter?.order === 'descend' ? 'desc' : null
 
-  const handleTableChange: TableProps<Product>['onChange'] = (_pagination, _filters, sorter) => {
-    const nextSorter = (Array.isArray(sorter) ? sorter[0] : sorter) as SorterResult<Product> | undefined
-
-    if (!nextSorter || !nextSorter.order) {
-      updateSearchParams({ sortBy: null, order: null })
-      return
-    }
-
-    const candidateField = nextSorter.field ?? nextSorter.columnKey
-    const resolvedField = candidateField === 'price' || candidateField === 'rating' ? candidateField : null
-    const resolvedOrder = nextSorter.order === 'ascend' ? 'asc' : nextSorter.order === 'descend' ? 'desc' : null
-
-    if (!resolvedField || !resolvedOrder) {
-      updateSearchParams({ sortBy: null, order: null })
-      return
-    }
-
-    updateSearchParams({ sortBy: resolvedField, order: resolvedOrder })
+    updateSearchParams({
+      sortBy: nextSortField,
+      order: nextSortDirection,
+    })
   }
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -94,88 +89,92 @@ export function ProductsPage() {
     queryFn: () => fetchProducts(searchQuery),
   })
 
-  const visibleSessionProducts = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase()
-
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  const products = [...sessionProducts, ...(data ?? [])].filter((product) => {
     if (!normalizedQuery) {
-      return sessionProducts
+      return true
     }
 
-    return sessionProducts.filter((product) => product.title.toLowerCase().includes(normalizedQuery))
-  }, [searchQuery, sessionProducts])
+    return product.title.toLowerCase().includes(normalizedQuery)
+  })
 
-  const mergedProducts = useMemo(() => {
-    return [...visibleSessionProducts, ...(data ?? [])]
-  }, [data, visibleSessionProducts])
-
-  const sortedProducts = useMemo(() => {
-    if (!sortField || !sortDirection) {
-      return mergedProducts
-    }
-
+  if (sortField && sortDirection) {
     const sortFactor = sortDirection === 'asc' ? 1 : -1
-    return [...mergedProducts].sort((firstProduct, secondProduct) => {
-      const firstValue = firstProduct[sortField]
-      const secondValue = secondProduct[sortField]
-      return (firstValue - secondValue) * sortFactor
-    })
-  }, [mergedProducts, sortDirection, sortField])
+    products.sort((firstProduct, secondProduct) => (firstProduct[sortField] - secondProduct[sortField]) * sortFactor)
+  }
 
-  const columns = useMemo<ColumnsType<Product>>(
-    () => [
-      {
-        title: 'Наименование',
-        dataIndex: 'title',
-        key: 'title',
-      },
-      {
-        title: 'Вендор',
-        dataIndex: 'brand',
-        key: 'brand',
-        render: (brand: Product['brand']) => brand ?? '—',
-      },
-      {
-        title: 'Артикул',
-        dataIndex: 'sku',
-        key: 'sku',
-        render: (sku: Product['sku']) => sku ?? '—',
-      },
-      {
-        title: 'Оценка',
-        dataIndex: 'rating',
-        key: 'rating',
-        sorter: true,
-        sortOrder: toSortOrder(sortField, sortDirection, 'rating'),
-        render: (rating: number) => (
-          <span className={rating < 3 ? 'rating-low' : undefined}>
-            {rating.toFixed(1)}
-          </span>
-        ),
-      },
-      {
-        title: 'Цена',
-        dataIndex: 'price',
-        key: 'price',
-        sorter: true,
-        sortOrder: toSortOrder(sortField, sortDirection, 'price'),
-        render: (price: number) => `${price.toFixed(2)} $`,
-      },
-      {
-        title: 'Количество',
-        dataIndex: 'stock',
-        key: 'stock',
-      },
-    ],
-    [sortDirection, sortField],
-  )
+  const columns: ColumnsType<Product> = [
+    {
+      title: 'Наименование',
+      dataIndex: 'title',
+      key: 'title',
+      width: 320,
+      render: (_title: string, product: Product) => (
+        <div className="product-name-cell">
+          <div className="product-thumb">
+            {product.thumbnail ? <img src={product.thumbnail} alt={product.title} /> : null}
+          </div>
+          <div className="product-name-meta">
+            <div className="product-name-title">{product.title}</div>
+            <div className="product-name-category">{product.category ?? 'Без категории'}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'Вендор',
+      dataIndex: 'brand',
+      key: 'brand',
+      width: 150,
+      render: (brand: Product['brand']) => <span className="product-brand">{brand ?? '—'}</span>,
+    },
+    {
+      title: 'Артикул',
+      dataIndex: 'sku',
+      key: 'sku',
+      width: 160,
+      render: (sku: Product['sku']) => sku ?? '—',
+    },
+    {
+      title: 'Оценка',
+      dataIndex: 'rating',
+      key: 'rating',
+      sorter: true,
+      sortOrder: toSortOrder(sortField, sortDirection, 'rating'),
+      width: 120,
+      render: (rating: number) => <span className={rating < 3 ? 'rating-low' : undefined}>{rating.toFixed(1)}/5</span>,
+    },
+    {
+      title: 'Цена, ₽',
+      dataIndex: 'price',
+      key: 'price',
+      sorter: true,
+      sortOrder: toSortOrder(sortField, sortDirection, 'price'),
+      width: 150,
+      render: (price: number) => formatPrice(price),
+    },
+    {
+      title: 'Количество',
+      dataIndex: 'stock',
+      key: 'stock',
+      width: 130,
+    },
+    {
+      title: '',
+      key: 'actions',
+      width: 120,
+      render: () => (
+        <div className="product-actions">
+          <Button className="product-action-add" type="primary" shape="round" icon={<PlusOutlined />} />
+          <Button className="product-action-more" shape="circle" icon={<EllipsisOutlined />} />
+        </div>
+      ),
+    },
+  ]
 
   const handleLogout = () => {
     logout()
     navigate(ROUTES.LOGIN, { replace: true })
-  }
-
-  const openAddModal = () => {
-    setIsAddModalOpen(true)
   }
 
   const closeAddModal = () => {
@@ -184,19 +183,21 @@ export function ProductsPage() {
   }
 
   const handleAddProductFinish = (values: AddProductFormValues) => {
-    const createdProduct: Product = {
-      id: Date.now(),
-      title: values.title.trim(),
-      brand: values.brand.trim(),
-      sku: values.sku.trim(),
-      rating: 0,
-      price: Number(values.price),
-      stock: 0,
-    }
+    setSessionProducts((previousProducts) => [
+      {
+        id: Date.now(),
+        title: values.title.trim(),
+        price: Number(values.price),
+        brand: values.brand.trim(),
+        sku: values.sku.trim(),
+        category: 'Локально добавлено',
+        rating: 0,
+        stock: 0,
+      },
+      ...previousProducts,
+    ])
 
-    setSessionProducts((previousProducts) => [createdProduct, ...previousProducts])
-    setIsAddModalOpen(false)
-    addProductForm.resetFields()
+    closeAddModal()
     messageApi.success('Товар успешно добавлен')
   }
 
@@ -204,31 +205,37 @@ export function ProductsPage() {
     <>
       {contextHolder}
       <Layout className="products-layout">
-        <Card
-          className="products-card"
-          title="Товары"
-          extra={
-            <Button onClick={handleLogout} type="default">
-              Выйти
-            </Button>
-          }
-        >
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <Typography.Text type="secondary">
-              Текущий пользователь: {user?.username ?? 'Не определен'}
-            </Typography.Text>
-
-            <div className="products-controls">
+        <div className="products-shell">
+          <Card className="products-toolbar-card" bordered={false}>
+            <div className="products-toolbar">
+              <Typography.Title className="products-page-title" level={2}>
+                Товары
+              </Typography.Title>
               <Input
-                className="products-search"
-                placeholder="Поиск по наименованию товара"
+                className="products-toolbar-search"
+                placeholder="Найти"
                 value={searchQuery}
                 allowClear
-                onChange={handleSearchChange}
+                prefix={<SearchOutlined />}
+                onChange={(event) => updateSearchParams({ q: event.target.value })}
               />
-              <Button type="primary" onClick={openAddModal}>
-                Добавить
+              <Button className="products-logout" icon={<LogoutOutlined />} onClick={handleLogout}>
+                Выйти
               </Button>
+            </div>
+          </Card>
+
+          <Card className="products-list-card" bordered={false}>
+            <div className="products-list-header">
+              <Typography.Title className="products-list-title" level={3}>
+                Все позиции
+              </Typography.Title>
+              <Space size={12}>
+                <Button className="products-icon-button" icon={<ReloadOutlined />} onClick={() => void refetch()} />
+                <Button className="products-add-button" type="primary" icon={<PlusOutlined />} onClick={() => setIsAddModalOpen(true)}>
+                  Добавить
+                </Button>
+              </Space>
             </div>
 
             {isError ? (
@@ -237,24 +244,23 @@ export function ProductsPage() {
                 description={error instanceof Error ? error.message : 'Неизвестная ошибка'}
                 type="error"
                 showIcon
-                action={
-                  <Button size="small" onClick={() => void refetch()}>
-                    Повторить
-                  </Button>
-                }
               />
             ) : null}
 
             <Table<Product>
+              className="products-table"
               rowKey="id"
               columns={columns}
-              dataSource={sortedProducts}
+              dataSource={products}
               loading={isLoading}
               onChange={handleTableChange}
-              pagination={{ pageSize: 10 }}
+              pagination={false}
+              rowSelection={{ columnWidth: 46 }}
+              scroll={{ x: 980 }}
+              locale={{ emptyText: 'Ничего не найдено' }}
             />
-          </Space>
-        </Card>
+          </Card>
+        </div>
       </Layout>
 
       <Modal

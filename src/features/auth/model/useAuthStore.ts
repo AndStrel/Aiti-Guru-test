@@ -20,6 +20,10 @@ function buildLocalSession(registered: RegisteredCredentials): AuthSession {
   }
 }
 
+function getErrorMessage(error: unknown, fallbackMessage: string): string {
+  return error instanceof Error ? error.message : fallbackMessage
+}
+
 export interface AuthState {
   user: AuthUser | null
   token: string | null
@@ -34,6 +38,34 @@ export interface AuthState {
   clearError: () => void
 }
 
+type SetAuthState = (state: Partial<AuthState>) => void
+
+function setAuthorizedState(setState: SetAuthState, session: AuthSession, registeredCredentials: RegisteredCredentials | null) {
+  setState({
+    user: session.user,
+    token: session.token,
+    registeredCredentials,
+    isAuthenticated: true,
+    isLoading: false,
+    error: null,
+  })
+}
+
+function setUnauthorizedState(
+  setState: SetAuthState,
+  registeredCredentials: RegisteredCredentials | null,
+  error: string | null = null,
+) {
+  setState({
+    user: null,
+    token: null,
+    registeredCredentials,
+    isAuthenticated: false,
+    isLoading: false,
+    error,
+  })
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
@@ -45,143 +77,80 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const session = loadAuthSession()
     const registeredCredentials = loadRegisteredCredentials()
 
-    set({
-      user: session?.user ?? null,
-      token: session?.token ?? null,
-      isAuthenticated: Boolean(session),
-      registeredCredentials,
-      error: null,
-    })
+    if (session) {
+      setAuthorizedState(set, session, registeredCredentials)
+      return
+    }
+
+    setUnauthorizedState(set, registeredCredentials)
   },
   login: async (credentials, remember) => {
-    const normalizedUsername = credentials.username.trim()
-    const existingRegisteredCredentials = get().registeredCredentials
+    const registeredCredentials = get().registeredCredentials
+    const username = credentials.username.trim()
 
-    set({
-      isLoading: true,
-      error: null,
-    })
+    set({ isLoading: true, error: null })
 
-    if (existingRegisteredCredentials && normalizedUsername === existingRegisteredCredentials.username) {
-      if (credentials.password !== existingRegisteredCredentials.password) {
+    if (registeredCredentials && username === registeredCredentials.username) {
+      if (credentials.password !== registeredCredentials.password) {
         clearAuthSession()
-
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: LOCAL_AUTH_ERROR,
-          registeredCredentials: existingRegisteredCredentials,
-        })
+        setUnauthorizedState(set, registeredCredentials, LOCAL_AUTH_ERROR)
 
         throw new Error(LOCAL_AUTH_ERROR)
       }
 
-      const localSession = buildLocalSession(existingRegisteredCredentials)
+      const localSession = buildLocalSession(registeredCredentials)
       saveAuthSession(localSession, remember)
-
-      set({
-        user: localSession.user,
-        token: localSession.token,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-        registeredCredentials: existingRegisteredCredentials,
-      })
+      setAuthorizedState(set, localSession, registeredCredentials)
 
       return
     }
 
     try {
       const session = await loginRequest({
-        username: normalizedUsername,
+        username,
         password: credentials.password,
       })
 
       saveAuthSession(session, remember)
-      set({
-        user: session.user,
-        token: session.token,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-        registeredCredentials: existingRegisteredCredentials,
-      })
+      setAuthorizedState(set, session, registeredCredentials)
     } catch (error) {
       clearAuthSession()
-
-      const authError = error instanceof Error ? error : new Error(DEFAULT_AUTH_ERROR)
-
-      set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: authError.message,
-        registeredCredentials: existingRegisteredCredentials,
-      })
-
-      throw authError
+      const errorMessage = getErrorMessage(error, DEFAULT_AUTH_ERROR)
+      setUnauthorizedState(set, registeredCredentials, errorMessage)
+      throw new Error(errorMessage)
     }
   },
   register: async (credentials, remember) => {
-    const normalizedUsername = credentials.username.trim()
+    const username = credentials.username.trim()
     const existingRegisteredCredentials = get().registeredCredentials
 
-    set({
-      isLoading: true,
-      error: null,
-    })
+    set({ isLoading: true, error: null })
 
     try {
       const session = await registerRequest({
-        username: normalizedUsername,
+        username,
         password: credentials.password,
       })
+
       const registeredCredentials: RegisteredCredentials = {
-        username: normalizedUsername,
+        username,
         password: credentials.password,
         user: session.user,
       }
 
       saveRegisteredCredentials(registeredCredentials)
       saveAuthSession(session, remember)
-      set({
-        user: session.user,
-        token: session.token,
-        registeredCredentials,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      })
+      setAuthorizedState(set, session, registeredCredentials)
     } catch (error) {
       clearAuthSession()
-
-      const registerError = error instanceof Error ? error : new Error(DEFAULT_REGISTER_ERROR)
-
-      set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: registerError.message,
-        registeredCredentials: existingRegisteredCredentials,
-      })
-
-      throw registerError
+      const errorMessage = getErrorMessage(error, DEFAULT_REGISTER_ERROR)
+      setUnauthorizedState(set, existingRegisteredCredentials, errorMessage)
+      throw new Error(errorMessage)
     }
   },
   logout: () => {
     clearAuthSession()
-    set({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-      registeredCredentials: get().registeredCredentials,
-    })
+    setUnauthorizedState(set, get().registeredCredentials)
   },
   clearError: () => {
     set({ error: null })
