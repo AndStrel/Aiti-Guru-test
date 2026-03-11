@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { useMutation } from '@tanstack/react-query'
 import { Alert, Button, Card, Checkbox, Divider, Form, Input, Layout, Typography, message } from 'antd'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../../features/auth/model/useAuthStore'
@@ -19,18 +19,10 @@ export function RegisterPage() {
   const [messageApi, contextHolder] = message.useMessage()
 
   const register = useAuthStore((state) => state.register)
-  const isLoading = useAuthStore((state) => state.isLoading)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  const error = useAuthStore((state) => state.error)
-  const clearError = useAuthStore((state) => state.clearError)
 
-  useEffect(() => {
-    clearError()
-    return clearError
-  }, [clearError])
-
-  const handleFinish = async (values: RegisterFormValues): Promise<void> => {
-    try {
+  const { mutateAsync: performRegister, isPending: isLoading, error, reset: clearError } = useMutation({
+    mutationFn: async (values: RegisterFormValues) => {
       await register(
         {
           username: values.username.trim(),
@@ -38,11 +30,16 @@ export function RegisterPage() {
         },
         values.remember,
       )
-    } catch (registerError) {
+    },
+    onError: (registerError) => {
       const errorText =
         registerError instanceof Error ? registerError.message : 'Не удалось зарегистрироваться'
       messageApi.error(errorText)
-    }
+    },
+  })
+
+  const handleFinish = async (values: RegisterFormValues): Promise<void> => {
+    await performRegister(values)
   }
 
   const handleValuesChange = () => {
@@ -131,7 +128,7 @@ export function RegisterPage() {
 
             {error ? (
               <Form.Item>
-                <Alert message={error} type="error" showIcon />
+                <Alert message={error instanceof Error ? error.message : 'Ошибка регистрации'} type="error" showIcon />
               </Form.Item>
             ) : null}
 

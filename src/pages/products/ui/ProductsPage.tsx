@@ -6,7 +6,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { SortOrder, SorterResult } from 'antd/es/table/interface'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchProducts } from '../../../entities/product/api/productsApi'
-import type { Product } from '../../../entities/product/model/product.types'
+import type { Product } from '../../../types'
 import { useAuthStore } from '../../../features/auth/model/useAuthStore'
 import { ROUTES } from '../../../shared/config/routes'
 
@@ -20,21 +20,7 @@ interface AddProductFormValues {
   sku: string
 }
 
-function parseSortField(value: string | null): SortField | null {
-  return value === 'price' || value === 'rating' ? value : null
-}
-
-function parseSortDirection(value: string | null): SortDirection | null {
-  return value === 'asc' || value === 'desc' ? value : null
-}
-
-function toSortOrder(sortField: SortField | null, sortDirection: SortDirection | null, field: SortField): SortOrder {
-  if (sortField !== field || !sortDirection) {
-    return null
-  }
-
-  return sortDirection === 'asc' ? 'ascend' : 'descend'
-}
+const PAGE_SIZE = 20
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -47,14 +33,18 @@ export function ProductsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
   const [sessionProducts, setSessionProducts] = useState<Product[]>([])
   const [addProductForm] = Form.useForm<AddProductFormValues>()
   const [messageApi, contextHolder] = message.useMessage()
 
   const logout = useAuthStore((state) => state.logout)
   const searchQuery = searchParams.get('q') ?? ''
-  const sortField = parseSortField(searchParams.get('sortBy'))
-  const sortDirection = parseSortDirection(searchParams.get('order'))
+  const sortField = searchParams.get('sortBy') as SortField | null
+  const sortDirection = searchParams.get('order') as SortDirection | null
+
+  const getSortOrder = (field: SortField): SortOrder =>
+    sortField === field && sortDirection ? (sortDirection === 'asc' ? 'ascend' : 'descend') : null
 
   const updateSearchParams = (updates: Record<string, string | null>) => {
     setSearchParams((currentParams) => {
@@ -73,14 +63,12 @@ export function ProductsPage() {
   }
 
   const handleTableChange = (_pagination: unknown, _filters: unknown, sorter: SorterResult<Product> | SorterResult<Product>[]) => {
-    const nextSorter = Array.isArray(sorter) ? sorter[0] : sorter
-    const candidateField = nextSorter?.field ?? nextSorter?.columnKey
-    const nextSortField = candidateField === 'price' || candidateField === 'rating' ? candidateField : null
-    const nextSortDirection = nextSorter?.order === 'ascend' ? 'asc' : nextSorter?.order === 'descend' ? 'desc' : null
+    const { field, order } = Array.isArray(sorter) ? sorter[0] : sorter
 
+    setCurrentPage(1)
     updateSearchParams({
-      sortBy: nextSortField,
-      order: nextSortDirection,
+      sortBy: (field === 'price' || field === 'rating') ? field : null,
+      order: order === 'ascend' ? 'asc' : order === 'descend' ? 'desc' : null,
     })
   }
 
@@ -90,17 +78,12 @@ export function ProductsPage() {
   })
 
   const normalizedQuery = searchQuery.trim().toLowerCase()
-  const products = [...sessionProducts, ...(data ?? [])].filter((product) => {
-    if (!normalizedQuery) {
-      return true
-    }
-
-    return product.title.toLowerCase().includes(normalizedQuery)
-  })
+  const localProducts = sessionProducts.filter((p) => !normalizedQuery || p.title.toLowerCase().includes(normalizedQuery))
+  const products = [...localProducts, ...(data ?? [])]
 
   if (sortField && sortDirection) {
-    const sortFactor = sortDirection === 'asc' ? 1 : -1
-    products.sort((firstProduct, secondProduct) => (firstProduct[sortField] - secondProduct[sortField]) * sortFactor)
+    const factor = sortDirection === 'asc' ? 1 : -1
+    products.sort((a, b) => (Number(a[sortField]) - Number(b[sortField])) * factor)
   }
 
   const columns: ColumnsType<Product> = [
@@ -140,7 +123,7 @@ export function ProductsPage() {
       dataIndex: 'rating',
       key: 'rating',
       sorter: true,
-      sortOrder: toSortOrder(sortField, sortDirection, 'rating'),
+      sortOrder: getSortOrder('rating'),
       width: 120,
       render: (rating: number) => <span className={rating < 3 ? 'rating-low' : undefined}>{rating.toFixed(1)}/5</span>,
     },
@@ -149,7 +132,7 @@ export function ProductsPage() {
       dataIndex: 'price',
       key: 'price',
       sorter: true,
-      sortOrder: toSortOrder(sortField, sortDirection, 'price'),
+      sortOrder: getSortOrder('price'),
       width: 150,
       render: (price: number) => formatPrice(price),
     },
@@ -177,7 +160,7 @@ export function ProductsPage() {
     navigate(ROUTES.LOGIN, { replace: true })
   }
 
-  const closeAddModal = () => {
+  const handleAddModalClose = () => {
     setIsAddModalOpen(false)
     addProductForm.resetFields()
   }
@@ -197,7 +180,8 @@ export function ProductsPage() {
       ...previousProducts,
     ])
 
-    closeAddModal()
+    setCurrentPage(1)
+    handleAddModalClose()
     messageApi.success('Товар успешно добавлен')
   }
 
@@ -217,7 +201,10 @@ export function ProductsPage() {
                 value={searchQuery}
                 allowClear
                 prefix={<SearchOutlined />}
-                onChange={(event) => updateSearchParams({ q: event.target.value })}
+                onChange={(event) => {
+                  setCurrentPage(1)
+                  updateSearchParams({ q: event.target.value })
+                }}
               />
               <Button className="products-logout" icon={<LogoutOutlined />} onClick={handleLogout}>
                 Выйти
@@ -254,7 +241,14 @@ export function ProductsPage() {
               dataSource={products}
               loading={isLoading}
               onChange={handleTableChange}
-              pagination={false}
+              pagination={{
+                current: currentPage,
+                pageSize: PAGE_SIZE,
+                total: products.length,
+                showSizeChanger: false,
+                onChange: setCurrentPage,
+                position: ['bottomRight'],
+              }}
               rowSelection={{ columnWidth: 46 }}
               scroll={{ x: 980 }}
               locale={{ emptyText: 'Ничего не найдено' }}
@@ -269,7 +263,7 @@ export function ProductsPage() {
         destroyOnClose
         okText="Добавить"
         cancelText="Отмена"
-        onCancel={closeAddModal}
+        onCancel={handleAddModalClose}
         onOk={() => addProductForm.submit()}
       >
         <Form<AddProductFormValues> form={addProductForm} layout="vertical" onFinish={handleAddProductFinish}>

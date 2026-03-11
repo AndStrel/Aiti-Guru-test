@@ -1,4 +1,4 @@
-import type { Product, ProductsResponse } from '../model/product.types'
+import type { Product, ProductsResponse } from '../../../types'
 
 const PRODUCTS_URL = 'https://dummyjson.com/products'
 const SEARCH_PRODUCTS_URL = 'https://dummyjson.com/products/search'

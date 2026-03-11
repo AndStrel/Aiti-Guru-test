@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { useMutation } from '@tanstack/react-query'
 import { Alert, Button, Card, Checkbox, Divider, Form, Input, Layout, Typography, message } from 'antd'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../../features/auth/model/useAuthStore'
@@ -18,18 +18,10 @@ export function LoginPage() {
   const [messageApi, contextHolder] = message.useMessage()
 
   const login = useAuthStore((state) => state.login)
-  const isLoading = useAuthStore((state) => state.isLoading)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  const error = useAuthStore((state) => state.error)
-  const clearError = useAuthStore((state) => state.clearError)
 
-  useEffect(() => {
-    clearError()
-    return clearError
-  }, [clearError])
-
-  const handleFinish = async (values: LoginFormValues): Promise<void> => {
-    try {
+  const { mutateAsync: performLogin, isPending: isLoading, error, reset: clearError } = useMutation({
+    mutationFn: async (values: LoginFormValues) => {
       await login(
         {
           username: values.email.trim(),
@@ -37,10 +29,15 @@ export function LoginPage() {
         },
         values.remember,
       )
-    } catch (authError) {
+    },
+    onError: (authError) => {
       const errorText = authError instanceof Error ? authError.message : 'Не удалось выполнить вход'
       messageApi.error(errorText)
-    }
+    },
+  })
+
+  const handleFinish = async (values: LoginFormValues): Promise<void> => {
+    await performLogin(values)
   }
 
   const handleValuesChange = () => {
@@ -107,7 +104,7 @@ export function LoginPage() {
 
             {error ? (
               <Form.Item>
-                <Alert message={error} type="error" showIcon />
+                <Alert message={error instanceof Error ? error.message : 'Ошибка входа'} type="error" showIcon />
               </Form.Item>
             ) : null}
 

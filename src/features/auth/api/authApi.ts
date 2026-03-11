@@ -1,4 +1,4 @@
-import type { AuthSession, AuthUser, LoginRequest, LoginResponse, RegisterRequest } from '../model/auth.types'
+import type { AuthSession, AuthUser, LoginRequest, LoginResponse, RegisterRequest } from '../../../types'
 
 const AUTH_LOGIN_URL = 'https://dummyjson.com/auth/login'
 const AUTH_REGISTER_URL = 'https://dummyjson.com/users/add'

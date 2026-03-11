@@ -7,22 +7,11 @@ import {
   saveAuthSession,
   saveRegisteredCredentials,
 } from '../lib/authStorage'
-import type { AuthSession, AuthUser, LoginRequest, RegisterRequest, RegisteredCredentials } from './auth.types'
+import type { AuthSession, AuthUser, LoginRequest, RegisterRequest, RegisteredCredentials } from '../../../types'
 
 const DEFAULT_AUTH_ERROR = 'Не удалось выполнить вход'
 const DEFAULT_REGISTER_ERROR = 'Не удалось зарегистрироваться'
 const LOCAL_AUTH_ERROR = 'Неверный логин или пароль для зарегистрированного аккаунта'
-
-function buildLocalSession(registered: RegisteredCredentials): AuthSession {
-  return {
-    user: registered.user,
-    token: `registered-${registered.user.id}-${Date.now()}`,
-  }
-}
-
-function getErrorMessage(error: unknown, fallbackMessage: string): string {
-  return error instanceof Error ? error.message : fallbackMessage
-}
 
 export interface AuthState {
   user: AuthUser | null
@@ -40,7 +29,22 @@ export interface AuthState {
 
 type SetAuthState = (state: Partial<AuthState>) => void
 
-function setAuthorizedState(setState: SetAuthState, session: AuthSession, registeredCredentials: RegisteredCredentials | null) {
+function buildLocalSession(registeredCredentials: RegisteredCredentials): AuthSession {
+  return {
+    user: registeredCredentials.user,
+    token: `registered-${registeredCredentials.user.id}-${Date.now()}`,
+  }
+}
+
+function getErrorMessage(error: unknown, fallbackMessage: string): string {
+  return error instanceof Error ? error.message : fallbackMessage
+}
+
+function setAuthorizedState(
+  setState: SetAuthState,
+  session: AuthSession,
+  registeredCredentials: RegisteredCredentials | null,
+): void {
   setState({
     user: session.user,
     token: session.token,
@@ -55,7 +59,7 @@ function setUnauthorizedState(
   setState: SetAuthState,
   registeredCredentials: RegisteredCredentials | null,
   error: string | null = null,
-) {
+): void {
   setState({
     user: null,
     token: null,
@@ -94,14 +98,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (credentials.password !== registeredCredentials.password) {
         clearAuthSession()
         setUnauthorizedState(set, registeredCredentials, LOCAL_AUTH_ERROR)
-
         throw new Error(LOCAL_AUTH_ERROR)
       }
 
-      const localSession = buildLocalSession(registeredCredentials)
-      saveAuthSession(localSession, remember)
-      setAuthorizedState(set, localSession, registeredCredentials)
-
+      const session = buildLocalSession(registeredCredentials)
+      saveAuthSession(session, remember)
+      setAuthorizedState(set, session, registeredCredentials)
       return
     }
 
@@ -122,7 +124,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   register: async (credentials, remember) => {
     const username = credentials.username.trim()
-    const existingRegisteredCredentials = get().registeredCredentials
+    const currentRegisteredCredentials = get().registeredCredentials
 
     set({ isLoading: true, error: null })
 
@@ -144,7 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       clearAuthSession()
       const errorMessage = getErrorMessage(error, DEFAULT_REGISTER_ERROR)
-      setUnauthorizedState(set, existingRegisteredCredentials, errorMessage)
+      setUnauthorizedState(set, currentRegisteredCredentials, errorMessage)
       throw new Error(errorMessage)
     }
   },

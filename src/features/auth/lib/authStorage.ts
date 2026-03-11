@@ -1,4 +1,4 @@
-import type { AuthSession, RegisteredCredentials } from '../model/auth.types'
+import type { AuthSession, RegisteredCredentials } from '../../../types'
 
 const AUTH_STORAGE_KEY = 'auth-session'
 const REGISTERED_CREDENTIALS_STORAGE_KEY = 'registered-credentials'
