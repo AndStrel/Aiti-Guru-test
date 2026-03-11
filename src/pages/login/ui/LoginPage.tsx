@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Checkbox, Divider, Form, Input, Layout, Typography, message } from 'antd'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../features/auth/model/useAuthStore'
@@ -8,7 +8,7 @@ import { ROUTES } from '../../../shared/config/routes'
 const REQUIRED_FIELD_MESSAGE = 'Поле обязательно для заполнения'
 
 interface LoginFormValues {
-  username: string
+  email: string
   password: string
   remember: boolean
 }
@@ -39,7 +39,7 @@ export function LoginPage() {
     try {
       await login(
         {
-          username: values.username.trim(),
+          username: values.email.trim(),
           password: values.password,
         },
         values.remember,
@@ -72,8 +72,12 @@ export function LoginPage() {
             onFinish={handleFinish}
             onValuesChange={handleValuesChange}
           >
-            <Form.Item label="Логин" name="username" rules={[{ required: true, message: REQUIRED_FIELD_MESSAGE }]}>
-              <Input autoComplete="username" placeholder="Введите логин (например, emilys)" prefix={<UserOutlined />} />
+            <Form.Item label="Почта" name="email" rules={[{ required: true, message: REQUIRED_FIELD_MESSAGE }]}>
+              <Input
+                autoComplete="email"
+                placeholder="Введите почту (для теста: emilys)"
+                prefix={<MailOutlined />}
+              />
             </Form.Item>
 
             <Form.Item
